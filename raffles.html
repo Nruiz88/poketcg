@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rifas — PokéTCG</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <script src="firebase-config.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --yellow: #ffcb05;
+      --yellow-dark: #c9a104;
+      --bg: #0a0a0f;
+      --bg-card: rgba(255,255,255,0.03);
+      --text: #f0f0f0;
+      --text-muted: #a0a0a8;
+      --text-dim: #555;
+      --border: rgba(255,255,255,0.06);
+      --border-hover: rgba(255,255,255,0.12);
+      --font-pixel: 'Press Start 2P', monospace;
+      --font: 'Inter', system-ui, sans-serif;
+      --shadow: 0 4px 16px rgba(0,0,0,0.4);
+      --radius: 12px;
+      --green: #3aa935;
+      --red: #e44;
+      --blue: #4488ff;
+    }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,203,5,0.015) 2px, rgba(255,203,5,0.015) 4px);
+      pointer-events: none; z-index: 9998;
+    }
+    body::after {
+      content: ''; position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(255,203,5,0.03), transparent 60%),
+        radial-gradient(ellipse at 80% 50%, rgba(100,60,200,0.03), transparent 60%);
+      pointer-events: none; z-index: -1;
+    }
+    .bg-pattern {
+      position: fixed; inset: 0;
+      background:
+        linear-gradient(45deg, transparent 18px, rgba(255,203,5,0.015) 18px, rgba(255,203,5,0.015) 20px, transparent 20px),
+        linear-gradient(-45deg, transparent 18px, rgba(255,203,5,0.015) 18px, rgba(255,203,5,0.015) 20px, transparent 20px);
+      background-size: 40px 40px;
+      pointer-events: none; z-index: -1;
+    }
+    .bg-foil {
+      position: fixed; inset: 0;
+      background:
+        repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(255,255,255,0.01) 3px, rgba(255,255,255,0.01) 4px),
+        repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,0.01) 3px, rgba(255,255,255,0.01) 4px);
+      pointer-events: none; z-index: -1; opacity: 0.5;
+    }
+    .bg-grid {
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none; z-index: -1;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== Nav ===== */
+    .top-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--border);
+    }
+    .top-nav .logo {
+      font-family: var(--font-pixel);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .top-nav .logo span { color: var(--yellow); }
+    .top-nav .logo .pixel-ball {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--yellow);
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, var(--yellow), var(--yellow-dark));
+      box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--yellow);
+    }
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--yellow); }
+
+    /* ===== Hero ===== */
+    .hero {
+      text-align: center;
+      padding: 3rem 1rem 2rem;
+    }
+    .hero h1 {
+      font-family: var(--font-pixel);
+      font-size: clamp(0.6rem, 1.5vw, 0.9rem);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      line-height: 1.8;
+    }
+    .hero h1 span { color: var(--yellow); }
+    .hero p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      max-width: 560px;
+      margin: 1rem auto 1.5rem;
+      line-height: 1.6;
+    }
+    .hero-badges {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+    }
+    .hero-badges span {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--text-muted);
+    }
+
+    /* ===== Raffle Card ===== */
+    .raffle-list {
+      display: grid;
+      gap: 2rem;
+      margin: 2rem 0;
+    }
+    .raffle-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .raffle-card:hover { border-color: var(--border-hover); }
+
+    .raffle-header {
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .raffle-header .info h2 {
+      font-family: var(--font-pixel);
+      font-size: 0.5rem;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.4rem;
+    }
+    .raffle-header .info p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+    .raffle-header .meta {
+      text-align: right;
+      white-space: nowrap;
+    }
+    .raffle-header .meta .price {
+      font-family: var(--font-pixel);
+      font-size: 0.45rem;
+      color: var(--yellow);
+    }
+    .raffle-header .meta .count {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 0.25rem;
+    }
+    .raffle-progress {
+      padding: 0 1.5rem 0.5rem;
+    }
+    .raffle-progress .bar {
+      height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .raffle-progress .bar .fill {
+      height: 100%;
+      background: var(--yellow);
+      border-radius: 4px;
+      transition: width 0.5s;
+    }
+    .raffle-progress .label {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      margin-top: 0.3rem;
+    }
+
+    /* ===== Number Grid ===== */
+    .grid-section {
+      padding: 0 1.5rem 1.25rem;
+    }
+    .number-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+      gap: 4px;
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 4px 0;
+    }
+    .number-grid::-webkit-scrollbar { width: 4px; }
+    .number-grid::-webkit-scrollbar-track { background: transparent; }
+    .number-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .num-cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+      background: rgba(255,255,255,0.02);
+    }
+    .num-cell:hover:not(.taken):not(.pending) {
+      border-color: var(--yellow);
+      background: rgba(255,203,5,0.08);
+    }
+    .num-cell.selected {
+      border-color: var(--yellow);
+      background: rgba(255,203,5,0.15);
+      color: var(--yellow);
+      box-shadow: 0 0 0 1px var(--yellow);
+    }
+    .num-cell.taken {
+      cursor: not-allowed;
+      opacity: 0.3;
+      background: rgba(255,255,255,0.01);
+    }
+    .num-cell.pending {
+      cursor: not-allowed;
+      opacity: 0.5;
+      background: rgba(255,203,5,0.05);
+      border-color: rgba(255,203,5,0.2);
+    }
+
+    .grid-legend {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.75rem;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      flex-wrap: wrap;
+    }
+    .grid-legend span { display: flex; align-items: center; gap: 0.3rem; }
+    .grid-legend .dot {
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      border: 1px solid var(--border);
+    }
+    .grid-legend .dot.avail { background: rgba(255,255,255,0.02); }
+    .grid-legend .dot.sel { background: rgba(255,203,5,0.3); border-color: var(--yellow); }
+    .grid-legend .dot.taken { background: rgba(255,255,255,0.02); opacity: 0.3; }
+    .grid-legend .dot.pend { background: rgba(255,203,5,0.1); border-color: rgba(255,203,5,0.3); }
+
+    /* ===== Purchase Panel ===== */
+    .purchase-panel {
+      padding: 1.25rem 1.5rem;
+      border-top: 1px solid var(--border);
+      display: none;
+    }
+    .purchase-panel.open { display: block; }
+
+    .purchase-panel .summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .purchase-panel .summary .nums {
+      font-family: var(--font-pixel);
+      font-size: 0.4rem;
+      color: var(--text-muted);
+    }
+    .purchase-panel .summary .total {
+      font-family: var(--font-pixel);
+      font-size: 0.5rem;
+      color: var(--yellow);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    .form-grid .full { grid-column: 1 / -1; }
+    .form-grid label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .form-grid input {
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.03);
+      color: var(--text);
+      font-size: 0.85rem;
+      font-family: var(--font);
+      outline: none;
+      transition: border 0.2s;
+    }
+    .form-grid input:focus { border-color: var(--yellow); }
+
+    .payment-info {
+      margin: 1rem 0;
+      padding: 1rem;
+      background: rgba(255,203,5,0.04);
+      border: 1px solid rgba(255,203,5,0.1);
+      border-radius: 8px;
+      font-size: 0.8rem;
+    }
+    .payment-info strong { color: var(--yellow); }
+    .payment-info .data-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.3rem 0;
+      gap: 0.5rem;
+    }
+    .payment-info .data-row code {
+      font-size: 0.8rem;
+      color: var(--text);
+      background: rgba(255,255,255,0.04);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      word-break: break-all;
+    }
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { border-color: var(--yellow); color: var(--yellow); }
+
+    .upload-area {
+      margin: 1rem 0;
+    }
+    .upload-area .upload-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .upload-area .upload-label:hover {
+      border-color: var(--yellow);
+      color: var(--yellow);
+    }
+    .upload-area .upload-label.has-file {
+      border-color: var(--green);
+      color: var(--green);
+    }
+    .upload-area input[type="file"] { display: none; }
+
+    .btn {
+      padding: 0.55rem 1.2rem;
+      border: none;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .btn-primary {
+      background: var(--yellow);
+      color: #0a0a0f;
+    }
+    .btn-primary:hover { background: var(--yellow-dark); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary {
+      background: rgba(255,255,255,0.04);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+
+    /* ===== Tracking ===== */
+    .tracking {
+      margin: 2rem 0;
+      text-align: center;
+    }
+    .tracking h3 {
+      font-family: var(--font-pixel);
+      font-size: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+      color: var(--text-muted);
+    }
+    .tracking-form {
+      display: flex;
+      gap: 0.5rem;
+      max-width: 450px;
+      margin: 0 auto;
+      justify-content: center;
+    }
+    .tracking-form input {
+      flex: 1;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.03);
+      color: var(--text);
+      font-size: 0.85rem;
+      font-family: var(--font);
+      outline: none;
+    }
+    .tracking-form input:focus { border-color: var(--yellow); }
+
+    /* ===== Success Modal ===== */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #14141e;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+    .modal .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .modal h2 {
+      font-family: var(--font-pixel);
+      font-size: 0.45rem;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    .modal .code-box {
+      margin: 1rem 0;
+      padding: 0.75rem;
+      background: rgba(255,203,5,0.06);
+      border: 1px solid rgba(255,203,5,0.15);
+      border-radius: 8px;
+      font-family: var(--font-pixel);
+      font-size: 0.7rem;
+      color: var(--yellow);
+      letter-spacing: 0.1em;
+    }
+    .modal p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+
+    /* ===== Toast ===== */
+    .toast-container {
+      position: fixed;
+      bottom: 1.5rem; right: 1.5rem;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .toast {
+      padding: 0.75rem 1.2rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: rgba(58,170,53,0.2); border: 1px solid rgba(58,170,53,0.3); color: #6c6; }
+    .toast.error { background: rgba(200,60,60,0.2); border: 1px solid rgba(200,60,60,0.3); color: #f66; }
+
+    /* ===== Footer ===== */
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+    footer a { color: var(--text-muted); text-decoration: none; }
+    footer a:hover { color: var(--yellow); }
+    footer .links { display: flex; justify-content: center; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+
+    /* ===== Loading ===== */
+    .loading {
+      text-align: center;
+      padding: 4rem 1rem;
+      color: var(--text-dim);
+    }
+
+    /* ===== No raffles ===== */
+    .empty {
+      text-align: center;
+      padding: 4rem 1rem;
+      color: var(--text-dim);
+    }
+    .empty .icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.3; }
+    .empty p { font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="bg-pattern"></div>
+  <div class="bg-foil"></div>
+  <div class="bg-grid"></div>
+
+  <div class="container">
+
+    <!-- Top Nav -->
+    <nav class="top-nav">
+      <a href="index.html" class="logo"><span class="pixel-ball"></span>Poké<span>TCG</span></a>
+      <div class="nav-links">
+        <a href="index.html">Tienda</a>
+        <a href="singles.html">Singles</a>
+        <a href="raffles.html" style="color:var(--yellow);">Rifas</a>
+        <a href="#" onclick="openTracking()">Mis números</a>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero">
+      <h1>Elegí tu número.<br>Ganá premios <span>grandiosos</span>.</h1>
+      <p>Rifas oficiales de PokéTCG. Elegí tus números, pagá por transferencia, subí tu comprobante y participá. Todo desde acá.</p>
+      <div class="hero-badges">
+        <span>✅ Pago verificado</span>
+        <span>🎲 Sorteo transparente</span>
+        <span>💬 Soporte por WhatsApp</span>
+      </div>
+    </header>
+
+    <!-- Raffles List -->
+    <div id="raffles-container">
+      <div class="loading" id="loading-msg">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">🎲</div>
+        <p>Cargando rifas…</p>
+      </div>
+    </div>
+
+    <!-- Tracking -->
+    <section class="tracking" id="tracking-section">
+      <h3>✦ Mis números</h3>
+      <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:0.75rem;">Ingresá tu código de seguimiento para ver el estado de tu pedido.</p>
+      <div class="tracking-form">
+        <input type="text" id="tracking-input" placeholder="Código de pedido" autocomplete="off">
+        <button class="btn btn-primary" onclick="trackOrder()">Buscar</button>
+      </div>
+      <div id="tracking-result" style="margin-top:1rem;"></div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <div class="links">
+        <a href="index.html">Tienda</a>
+        <a href="singles.html">Singles</a>
+        <a href="raffles.html">Rifas activas</a>
+        <a href="#" onclick="openTracking()">Mis números</a>
+        <a href="admin.html">Admin</a>
+      </div>
+      <p>&copy; 2026 PokéTCG &mdash; Pokémon es propiedad de Nintendo, Game Freak y Creatures.</p>
+    </footer>
+  </div>
+
+  <!-- Success Modal -->
+  <div class="modal-overlay" id="success-modal">
+    <div class="modal">
+      <div class="icon">🎉</div>
+      <h2>Reserva confirmada</h2>
+      <p style="margin-bottom:0.75rem;">Guardá este código para seguir tu pedido:</p>
+      <div class="code-box" id="order-code-display">---</div>
+      <p style="font-size:0.75rem;">Te llegará un WhatsApp de confirmación cuando verifiquemos el pago.</p>
+      <button class="btn btn-primary" style="margin-top:1rem;" onclick="closeModal()">Listo</button>
+    </div>
+  </div>
+
+  <!-- Tracking Result Modal -->
+  <div class="modal-overlay" id="tracking-modal">
+    <div class="modal" style="text-align:left;">
+      <div class="icon" style="text-align:center;">📋</div>
+      <h2 style="text-align:center;">Tu pedido</h2>
+      <div id="tracking-detail" style="margin-top:1rem;font-size:0.85rem;"></div>
+      <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="closeTrackingModal()">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script>
+    (function() {
+      /* ===== REFS ===== */
+      var container = document.getElementById('raffles-container');
+      var loadingMsg = document.getElementById('loading-msg');
+      var toastContainer = document.getElementById('toast-container');
+
+      /* ===== DATA ===== */
+      var allRaffles = []; window.allRaffles = allRaffles;
+      var selectedRaffleId = null;
+      var selectedNumbers = {}; // raffleId -> [nums]
+      var raffleNumMap = {}; // raffleId -> {number: status}
+
+      /* ===== HELPERS ===== */
+      function escHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      function showToast(msg, type) {
+        var el = document.createElement('div');
+        el.className = 'toast ' + type;
+        el.textContent = msg;
+        toastContainer.appendChild(el);
+        requestAnimationFrame(function() { el.classList.add('show'); });
+        setTimeout(function() {
+          el.classList.remove('show');
+          setTimeout(function() { el.remove(); }, 300);
+        }, 3000);
+      }
+
+      function formatPrice(n) {
+        return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      }
+
+      /* ===== LOAD RAFFLES ===== */
+      function loadRaffles() {
+        if (typeof db === 'undefined') {
+          loadingMsg.innerHTML = '<p style="color:var(--text-dim);">Firebase no configurado</p>';
+          return;
+        }
+        db.collection('raffles').where('status', '==', 'active').orderBy('createdAt', 'desc').onSnapshot(function(snapshot) {
+          allRaffles = [];
+          snapshot.forEach(function(doc) { allRaffles.push({ id: doc.id, data: doc.data() }); });
+          if (allRaffles.length === 0) {
+            container.innerHTML =
+              '<div class="empty"><div class="icon">🎲</div><p>No hay rifas activas en este momento. Volvé pronto.</p></div>';
+            return;
+          }
+          // Cargar números de cada rifa
+          var promises = allRaffles.map(function(r) {
+            return loadNumbersForRaffle(r.id);
+          });
+          Promise.all(promises).then(function() {
+            renderRaffles();
+          });
+        }, function(err) {
+          loadingMsg.innerHTML = '<p style="color:var(--red);">Error al cargar: ' + escHtml(err.message) + '</p>';
+        });
+      }
+
+      function loadNumbersForRaffle(raffleId) {
+        return db.collection('raffle_purchases')
+          .where('raffleId', '==', raffleId)
+          .get()
+          .then(function(snapshot) {
+            var map = {};
+            snapshot.forEach(function(doc) {
+              var d = doc.data();
+              (d.numbers || []).forEach(function(n) {
+                map[n] = d.status; // 'pending' | 'verified'
+              });
+            });
+            raffleNumMap[raffleId] = map;
+          });
+      }
+
+      /* ===== RENDER ===== */
+      function renderRaffles() {
+        container.innerHTML = '<div class="raffle-list" id="raffle-list"></div>';
+        var list = document.getElementById('raffle-list');
+        allRaffles.forEach(function(r) {
+          var d = r.data;
+          var numMap = raffleNumMap[r.id] || {};
+          var takenCount = Object.keys(numMap).length;
+          var pct = Math.min(100, Math.round((takenCount / d.totalNumbers) * 100));
+          var gridHtml = '';
+          for (var i = 1; i <= d.totalNumbers; i++) {
+            var status = numMap[i];
+            var cls = 'num-cell';
+            var sel = (selectedNumbers[r.id] || []).indexOf(i) !== -1;
+            if (status === 'verified') cls += ' taken';
+            else if (status === 'pending') cls += ' pending';
+            else if (sel) cls += ' selected';
+            gridHtml += '<div class="' + cls + '" data-raffle="' + r.id + '" data-num="' + i + '">' + i + '</div>';
+          }
+          var selNums = selectedNumbers[r.id] || [];
+          var totalPrice = selNums.length * d.price;
+
+          var card = document.createElement('div');
+          card.className = 'raffle-card';
+          card.innerHTML =
+            '<div class="raffle-header">' +
+              '<div class="info">' +
+                '<h2>' + escHtml(d.title) + '</h2>' +
+                '<p>' + escHtml(d.description || '') + '</p>' +
+              '</div>' +
+              '<div class="meta">' +
+                '<div class="price">' + formatPrice(d.price) + ' c/u</div>' +
+                '<div class="count">' + takenCount + '/' + d.totalNumbers + ' vendidos</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="raffle-progress">' +
+              '<div class="bar"><div class="fill" style="width:' + pct + '%;"></div></div>' +
+              '<div class="label">' + pct + '% completado' + (d.drawDate ? ' · Sorteo: ' + new Date(d.drawDate.seconds * 1000).toLocaleDateString() : '') + '</div>' +
+            '</div>' +
+            '<div class="grid-section">' +
+              '<div class="number-grid">' + gridHtml + '</div>' +
+              '<div class="grid-legend">' +
+                '<span><span class="dot avail"></span> Disponible</span>' +
+                '<span><span class="dot sel"></span> Seleccionado</span>' +
+                '<span><span class="dot pend"></span> Pendiente</span>' +
+                '<span><span class="dot taken"></span> Vendido</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="purchase-panel' + (selNums.length > 0 ? ' open' : '') + '" data-panel="' + r.id + '">' +
+              '<div class="summary">' +
+                '<div class="nums">' + (selNums.length > 0 ? 'Números: ' + selNums.join(', ') : 'Seleccioná números arriba') + '</div>' +
+                '<div class="total">' + (selNums.length > 0 ? 'Total: ' + formatPrice(totalPrice) : '') + '</div>' +
+              '</div>' +
+              '<div id="purchase-form-' + r.id + '">' +
+                (selNums.length > 0 ? buildPurchaseForm(r) : '') +
+              '</div>' +
+            '</div>';
+          list.appendChild(card);
+        });
+
+        // Attach events
+        document.querySelectorAll('.num-cell:not(.taken):not(.pending)').forEach(function(el) {
+          el.addEventListener('click', function() {
+            var rid = el.getAttribute('data-raffle');
+            var num = parseInt(el.getAttribute('data-num'), 10);
+            toggleNumber(rid, num);
+          });
+        });
+      }
+
+      function buildPurchaseForm(r) {
+        var d = r.data;
+        return (
+          '<div class="form-grid">' +
+            '<label>Nombre <input type="text" id="p-name-' + r.id + '" placeholder="Tu nombre" required autocomplete="off"></label>' +
+            '<label>WhatsApp <input type="text" id="p-phone-' + r.id + '" placeholder="11 1234 5678" required autocomplete="off"></label>' +
+            '<div class="full payment-info">' +
+              '<strong>Datos para transferir</strong>' +
+              '<div class="data-row"><span>Alias</span><span><code id="alias-display">POKETCG.ALIAS</code><button class="copy-btn" onclick="copyText(\'POKETCG.ALIAS\')">Copiar</button></span></div>' +
+              '<div class="data-row"><span>CBU</span><span><code id="cbu-display">0000000000000000000000</code><button class="copy-btn" onclick="copyText(\'0000000000000000000000\')">Copiar</button></span></div>' +
+              '<div style="font-size:0.7rem;color:var(--text-dim);margin-top:0.5rem;">💡 Transferí el monto exacto y subí el comprobante abajo.</div>' +
+            '</div>' +
+            '<div class="full upload-area">' +
+              '<label class="upload-label" id="upload-label-' + r.id + '">' +
+                '<input type="file" accept="image/*" onchange="handleFileUpload(event, \'' + r.id + '\')">' +
+                '<span id="upload-text-' + r.id + '">📷 Subir comprobante de pago</span>' +
+              '</label>' +
+            '</div>' +
+            '<div class="full" style="display:flex;gap:0.5rem;">' +
+              '<button class="btn btn-primary" onclick="submitPurchase(\'' + r.id + '\')" id="btn-submit-' + r.id + '">Confirmar y participar</button>' +
+              '<button class="btn btn-secondary" onclick="clearSelection(\'' + r.id + '\')">Limpiar</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+
+      /* ===== INTERACTION ===== */
+      window.toggleNumber = function(raffleId, num) {
+        if (!selectedNumbers[raffleId]) selectedNumbers[raffleId] = [];
+        var arr = selectedNumbers[raffleId];
+        var idx = arr.indexOf(num);
+        if (idx !== -1) { arr.splice(idx, 1); }
+        else { arr.push(num); }
+        renderRaffles();
+      };
+
+      window.clearSelection = function(raffleId) {
+        selectedNumbers[raffleId] = [];
+        renderRaffles();
+      };
+
+      // File upload handler
+      window.pendingFiles = {};
+      window.handleFileUpload = function(e, raffleId) {
+        var file = e.target.files[0];
+        if (!file) return;
+        window.pendingFiles[raffleId] = file;
+        var label = document.getElementById('upload-label-' + raffleId);
+        if (label) {
+          label.classList.add('has-file');
+          label.querySelector('span').textContent = '✅ ' + file.name;
+        }
+      };
+
+      // Copy
+      window.copyText = function(text) {
+        navigator.clipboard.writeText(text).then(function() {
+          showToast('✓ Copiado', 'success');
+        });
+      };
+
+      /* ===== SUBMIT ===== */
+      window.submitPurchase = function(raffleId) {
+        var nums = selectedNumbers[raffleId];
+        if (!nums || nums.length === 0) {
+          showToast('Seleccioná al menos un número', 'error');
+          return;
+        }
+        var name = document.getElementById('p-name-' + raffleId);
+        var phone = document.getElementById('p-phone-' + raffleId);
+        if (!name.value.trim()) { showToast('Ingresá tu nombre', 'error'); name.focus(); return; }
+        if (!phone.value.trim()) { showToast('Ingresá tu WhatsApp', 'error'); phone.focus(); return; }
+
+        var file = window.pendingFiles[raffleId];
+        if (!file) { showToast('Subí el comprobante de pago', 'error'); return; }
+
+        var btn = document.getElementById('btn-submit-' + raffleId);
+        btn.disabled = true;
+        btn.textContent = 'Enviando…';
+
+        // Subir comprobante
+        var ref = storage.ref('comprobantes/' + raffleId + '_' + Date.now() + '.' + file.name.split('.').pop());
+        ref.put(file).then(function(snapshot) {
+          return snapshot.ref.getDownloadURL();
+        }).then(function(url) {
+          // Crear purchase
+          return db.collection('raffle_purchases').add({
+            raffleId: raffleId,
+            numbers: nums,
+            userName: name.value.trim(),
+            userPhone: phone.value.trim(),
+            total: nums.length * (allRaffles.find(function(r) { return r.id === raffleId; }).data.price),
+            paymentProof: url,
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }).then(function(ref) {
+          // Mostrar código de seguimiento
+          document.getElementById('order-code-display').textContent = ref.id;
+          document.getElementById('success-modal').classList.add('open');
+          // Limpiar selección
+          delete window.pendingFiles[raffleId];
+          selectedNumbers[raffleId] = [];
+          renderRaffles();
+        }).catch(function(err) {
+          showToast('Error: ' + err.message, 'error');
+          btn.disabled = false;
+          btn.textContent = 'Confirmar y participar';
+        });
+      };
+
+      /* ===== MODALS ===== */
+      window.closeModal = function() {
+        document.getElementById('success-modal').classList.remove('open');
+      };
+
+      window.closeTrackingModal = function() {
+        document.getElementById('tracking-modal').classList.remove('open');
+      };
+
+      /* ===== TRACKING ===== */
+      window.openTracking = function() {
+        document.getElementById('tracking-input').value = '';
+        document.getElementById('tracking-result').innerHTML = '';
+        document.getElementById('tracking-section').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('tracking-input').focus();
+      };
+
+      window.trackOrder = function() {
+        var code = document.getElementById('tracking-input').value.trim();
+        if (!code) { showToast('Ingresá un código', 'error'); return; }
+        if (typeof db === 'undefined') { showToast('Firebase no disponible', 'error'); return; }
+
+        db.collection('raffle_purchases').doc(code).get().then(function(doc) {
+          if (!doc.exists) {
+            showToast('Código no encontrado', 'error');
+            return;
+          }
+          var d = doc.data();
+          var statusMap = { pending: '⏳ Pendiente de verificación', verified: '✅ Verificado', cancelled: '❌ Cancelado' };
+          var statusText = statusMap[d.status] || d.status;
+
+          // Buscar nombre de la rifa
+          var raffleTitle = 'Rifa #' + d.raffleId;
+          if (allRaffles.length > 0) {
+            var found = allRaffles.find(function(r) { return r.id === d.raffleId; });
+            if (found) raffleTitle = found.data.title;
+          }
+
+          var html =
+            '<div style="margin-bottom:0.75rem;"><strong>Estado:</strong> ' + statusText + '</div>' +
+            '<div style="margin-bottom:0.5rem;"><strong>Rifa:</strong> ' + escHtml(raffleTitle) + '</div>' +
+            '<div style="margin-bottom:0.5rem;"><strong>Números:</strong> ' + (d.numbers || []).join(', ') + '</div>' +
+            '<div style="margin-bottom:0.5rem;"><strong>Nombre:</strong> ' + escHtml(d.userName || '') + '</div>' +
+            '<div style="margin-bottom:0.5rem;"><strong>WhatsApp:</strong> ' + escHtml(d.userPhone || '') + '</div>' +
+            '<div style="margin-bottom:0.5rem;"><strong>Total:</strong> ' + formatPrice(d.total || 0) + '</div>';
+
+          if (d.status === 'verified') {
+            html += '<div style="margin-top:0.75rem;padding:0.75rem;background:rgba(58,170,53,0.1);border-radius:6px;color:#6c6;">✅ Pago verificado — estás participando. ¡Buena suerte!</div>';
+          } else if (d.status === 'pending') {
+            html += '<div style="margin-top:0.75rem;padding:0.75rem;background:rgba(255,203,5,0.06);border-radius:6px;color:var(--yellow);">⏳ Estamos revisando tu pago. Te confirmamos por WhatsApp a la brevedad.</div>';
+          }
+
+          document.getElementById('tracking-detail').innerHTML = html;
+          document.getElementById('tracking-modal').classList.add('open');
+        }).catch(function(err) {
+          showToast('Error: ' + err.message, 'error');
+        });
+      };
+
+      // Cerrar modales con Escape
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          closeModal();
+          closeTrackingModal();
+        }
+      });
+
+      // Cerrar modal clickeando fuera
+      document.querySelectorAll('.modal-overlay').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+          if (e.target === el) {
+            el.classList.remove('open');
+          }
+        });
+      });
+
+      /* ===== INIT ===== */
+      loadRaffles();
+    })();
+  </script>
+</body>
+</html>
