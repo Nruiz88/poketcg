@@ -886,35 +886,47 @@
         var file = window.pendingFiles[raffleId];
         if (!file) { showToast('Subí el comprobante de pago', 'error'); return; }
 
+        if (typeof storage === 'undefined' || !storage) {
+          showToast('Error: Storage no disponible. Activá Firebase Storage en la consola.', 'error');
+          return;
+        }
+
+        // Buscar la rifa para obtener el precio
+        var raffle = allRaffles.find(function(r) { return r.id === raffleId; });
+        if (!raffle) {
+          showToast('Error: rifa no encontrada', 'error');
+          return;
+        }
+
         var btn = document.getElementById('btn-submit-' + raffleId);
         btn.disabled = true;
-        btn.textContent = 'Enviando…';
+        btn.textContent = 'Subiendo comprobante…';
 
-        // Subir comprobante
-        var ref = storage.ref('comprobantes/' + raffleId + '_' + Date.now() + '.' + file.name.split('.').pop());
+        var ext = file.name.split('.').pop();
+        var ref = storage.ref('comprobantes/' + raffleId + '_' + Date.now() + '.' + ext);
+
         ref.put(file).then(function(snapshot) {
+          btn.textContent = 'Guardando…';
           return snapshot.ref.getDownloadURL();
         }).then(function(url) {
-          // Crear purchase
           return db.collection('raffle_purchases').add({
             raffleId: raffleId,
             numbers: nums,
             userName: name.value.trim(),
             userPhone: phone.value.trim(),
-            total: nums.length * (allRaffles.find(function(r) { return r.id === raffleId; }).data.price),
+            total: nums.length * raffle.data.price,
             paymentProof: url,
             status: 'pending',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           });
         }).then(function(ref) {
-          // Mostrar código de seguimiento
           document.getElementById('order-code-display').textContent = ref.id;
           document.getElementById('success-modal').classList.add('open');
-          // Limpiar selección
           delete window.pendingFiles[raffleId];
           selectedNumbers[raffleId] = [];
           renderRaffles();
         }).catch(function(err) {
+          console.error('Error en submitPurchase:', err);
           showToast('Error: ' + err.message, 'error');
           btn.disabled = false;
           btn.textContent = 'Confirmar y participar';
