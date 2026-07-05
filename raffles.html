@@ -695,8 +695,12 @@
 
       /* ===== LOAD RAFFLES ===== */
       function loadRaffles() {
+        if (typeof firebase === 'undefined') {
+          loadingMsg.innerHTML = '<p style="color:var(--text-dim);">Error: Firebase SDK no cargó. Serví los archivos con un servidor local (npx serve) en vez de abrirlos como archivo.</p>';
+          return;
+        }
         if (typeof db === 'undefined') {
-          loadingMsg.innerHTML = '<p style="color:var(--text-dim);">Firebase no configurado</p>';
+          loadingMsg.innerHTML = '<p style="color:var(--text-dim);">Firebase no configurado. Revisá firebase-config.js</p>';
           return;
         }
         db.collection('raffles').where('status', '==', 'active').orderBy('createdAt', 'desc').onSnapshot(function(snapshot) {
