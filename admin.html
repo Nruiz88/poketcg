@@ -10,7 +10,6 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
   <script src="firebase-config.js"></script>
 
   <style>
@@ -949,17 +948,17 @@
       var allDocs = [];
 
       // Imagen temporal: file a subir o null si no cambia
-      var pendingImageFile = null;
-      var existingImageUrl = null; // al editar, la URL actual
+      var pendingImageBase64 = null; // string base64 o null
+      var existingImageUrl = null;
 
       /* ===== Preview ===== */
       fImage.addEventListener('change', function() {
         var file = fImage.files[0];
         if (!file) return;
-        pendingImageFile = file;
         var reader = new FileReader();
         reader.onload = function(e) {
-          previewImg.src = e.target.result;
+          pendingImageBase64 = e.target.result;
+          previewImg.src = pendingImageBase64;
           previewWrap.style.display = 'block';
         };
         reader.readAsDataURL(file);
@@ -967,7 +966,7 @@
 
       removeImgBtn.addEventListener('click', function() {
         fImage.value = '';
-        pendingImageFile = null;
+        pendingImageBase64 = null;
         previewWrap.style.display = 'none';
       });
 
@@ -1091,16 +1090,6 @@
         return d.innerHTML;
       }
 
-      /* ===== Upload image a Storage ===== */
-      function uploadImage(file, cardDocId) {
-        if (!file) return Promise.resolve(null);
-
-        var ref = storage.ref('cards/' + cardDocId + '_' + Date.now() + '.' + file.name.split('.').pop());
-        return ref.put(file).then(function(snapshot) {
-          return snapshot.ref.getDownloadURL();
-        });
-      }
-
       /* ===== CRUD ===== */
 
       // Submit
@@ -1108,7 +1097,7 @@
         e.preventDefault();
 
         btnSubmit.disabled = true;
-        btnSubmitText.textContent = 'Subiendo…';
+        btnSubmitText.textContent = 'Guardando…';
 
         var cardData = {
           name: fName.value.trim(),
@@ -1118,11 +1107,12 @@
           price: parseFloat(fPrice.value) || 0
         };
 
-        function saveCard(imageUrl) {
-          if (imageUrl) cardData.imageUrl = imageUrl;
+        if (pendingImageBase64) {
+          cardData.imageUrl = pendingImageBase64;
+        }
 
+        function doSave() {
           if (editingId) {
-            // merge para no borrar imageUrl si no se subió nueva
             var updateData = {
               name: cardData.name,
               setName: cardData.setName,
@@ -1130,7 +1120,7 @@
               type: cardData.type,
               price: cardData.price
             };
-            if (imageUrl) updateData.imageUrl = imageUrl;
+            if (cardData.imageUrl) updateData.imageUrl = cardData.imageUrl;
             return cardsRef.doc(editingId).update(updateData);
           } else {
             return cardsRef.orderBy('id', 'desc').limit(1).get().then(function(snapshot) {
@@ -1142,25 +1132,7 @@
           }
         }
 
-        var savePromise;
-
-        if (pendingImageFile) {
-          // 1. obtener docId temporal para la ruta de storage
-          if (editingId) {
-            savePromise = uploadImage(pendingImageFile, editingId).then(saveCard);
-          } else {
-            // crear doc vacío primero para obtener ID
-            var tempRef = cardsRef.doc();
-            savePromise = uploadImage(pendingImageFile, tempRef.id).then(function(url) {
-              return saveCard(url);
-            });
-          }
-        } else {
-          // sin imagen nueva
-          savePromise = saveCard(null);
-        }
-
-        savePromise.then(function() {
+        doSave().then(function() {
           showToast(editingId ? 'Carta actualizada' : 'Carta agregada', 'success');
           resetForm();
         }).catch(function(err) {
@@ -1192,7 +1164,7 @@
           } else {
             previewWrap.style.display = 'none';
           }
-          pendingImageFile = null;
+          pendingImageBase64 = null;
           fImage.value = '';
 
           formTitle.textContent = 'Editar carta';
@@ -1225,7 +1197,7 @@
         editId.value = '';
         cardForm.reset();
         fImage.value = '';
-        pendingImageFile = null;
+        pendingImageBase64 = null;
         previewWrap.style.display = 'none';
         formTitle.textContent = 'Agregar carta';
         formIcon.textContent = '✦';

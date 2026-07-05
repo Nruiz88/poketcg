@@ -9,7 +9,6 @@
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
   <script src="firebase-config.js"></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -886,11 +885,6 @@
         var file = window.pendingFiles[raffleId];
         if (!file) { showToast('Subí el comprobante de pago', 'error'); return; }
 
-        if (typeof storage === 'undefined' || !storage) {
-          showToast('Error: Storage no disponible. Activá Firebase Storage en la consola.', 'error');
-          return;
-        }
-
         // Buscar la rifa para obtener el precio
         var raffle = allRaffles.find(function(r) { return r.id === raffleId; });
         if (!raffle) {
@@ -900,37 +894,41 @@
 
         var btn = document.getElementById('btn-submit-' + raffleId);
         btn.disabled = true;
-        btn.textContent = 'Subiendo comprobante…';
+        btn.textContent = 'Procesando…';
 
-        var ext = file.name.split('.').pop();
-        var ref = storage.ref('comprobantes/' + raffleId + '_' + Date.now() + '.' + ext);
+        // Convertir imagen a base64
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var base64 = e.target.result;
 
-        ref.put(file).then(function(snapshot) {
-          btn.textContent = 'Guardando…';
-          return snapshot.ref.getDownloadURL();
-        }).then(function(url) {
-          return db.collection('raffle_purchases').add({
+          db.collection('raffle_purchases').add({
             raffleId: raffleId,
             numbers: nums,
             userName: name.value.trim(),
             userPhone: phone.value.trim(),
             total: nums.length * raffle.data.price,
-            paymentProof: url,
+            paymentProof: base64,
             status: 'pending',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function(ref) {
+            document.getElementById('order-code-display').textContent = ref.id;
+            document.getElementById('success-modal').classList.add('open');
+            delete window.pendingFiles[raffleId];
+            selectedNumbers[raffleId] = [];
+            renderRaffles();
+          }).catch(function(err) {
+            console.error('Error en submitPurchase:', err);
+            showToast('Error: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Confirmar y participar';
           });
-        }).then(function(ref) {
-          document.getElementById('order-code-display').textContent = ref.id;
-          document.getElementById('success-modal').classList.add('open');
-          delete window.pendingFiles[raffleId];
-          selectedNumbers[raffleId] = [];
-          renderRaffles();
-        }).catch(function(err) {
-          console.error('Error en submitPurchase:', err);
-          showToast('Error: ' + err.message, 'error');
+        };
+        reader.onerror = function() {
+          showToast('Error al leer el archivo', 'error');
           btn.disabled = false;
           btn.textContent = 'Confirmar y participar';
-        });
+        };
+        reader.readAsDataURL(file);
       };
 
       /* ===== MODALS ===== */

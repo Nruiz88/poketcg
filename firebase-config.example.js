@@ -12,13 +12,12 @@ var firebaseConfig = {
   appId: 'TU_APP_ID'
 };
 
-var db, auth, storage;
+var db, auth;
 
 try {
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
   auth = firebase.auth();
-  storage = firebase.storage();
   if (db.settings) db.settings({ merge: true });
 } catch (e) {
   console.warn('Firebase no configurado — usando datos estáticos');
