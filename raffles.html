@@ -703,9 +703,10 @@
           loadingMsg.innerHTML = '<p style="color:var(--text-dim);">Firebase no configurado. Revisá firebase-config.js</p>';
           return;
         }
-        db.collection('raffles').where('status', '==', 'active').orderBy('createdAt', 'desc').onSnapshot(function(snapshot) {
+        db.collection('raffles').where('status', '==', 'active').onSnapshot(function(snapshot) {
           allRaffles = [];
           snapshot.forEach(function(doc) { allRaffles.push({ id: doc.id, data: doc.data() }); });
+          allRaffles.sort(function(a, b) { return (b.data.createdAt || 0) - (a.data.createdAt || 0); });
           if (allRaffles.length === 0) {
             container.innerHTML =
               '<div class="empty"><div class="icon">🎲</div><p>No hay rifas activas en este momento. Volvé pronto.</p></div>';
