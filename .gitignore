@@ -1,5 +1,6 @@
 # Firebase config (contiene API keys)
 firebase-config.js
+js/firebase-config.js
 
 # OS
 Thumbs.db
