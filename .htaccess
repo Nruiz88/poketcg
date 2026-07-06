@@ -1,4 +1,6 @@
 RewriteEngine On
+RewriteBase /poketcg/
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{DOCUMENT_ROOT}/poketcg/$1.php -f
 RewriteRule ^(.+)$ $1.php [L]
